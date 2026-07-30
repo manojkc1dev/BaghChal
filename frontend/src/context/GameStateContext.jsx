@@ -1,112 +1,130 @@
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import {
   createInitialBoard,
   getValidMovesForNode,
   evaluateGameStatus,
   TOTAL_SHEEP_RESERVE,
 } from '../utils/gameLogic';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const GameStateContext = createContext(null);
 
 const initialState = {
+  mode: 'LOCAL', // 'LOCAL' | 'PVAI' | 'PVP'
+  aiRole: 'LION', // 'LION' | 'SHEEP' (AI plays as Lion by default in PVAI)
+  roomName: 'room-1',
   board: createInitialBoard(),
-  currentTurn: 'SHEEP', // Sheep places/moves first
-  gamePhase: 'PLACEMENT', // 'PLACEMENT' | 'MOVEMENT'
-  unplacedSheep: TOTAL_SHEEP_RESERVE, // 20
+  currentTurn: 'SHEEP',
+  gamePhase: 'PLACEMENT',
+  unplacedSheep: TOTAL_SHEEP_RESERVE,
   capturedSheep: 0,
   selectedNode: null,
-  validMoves: [], // Array of { type: 'MOVE'|'CAPTURE', to: number, capturedNode?: number }
-  gameStatus: 'IN_PROGRESS', // 'IN_PROGRESS' | 'LIONS_WON' | 'SHEEP_WON'
+  validMoves: [],
+  gameStatus: 'IN_PROGRESS',
   moveHistory: [],
 };
 
 function gameReducer(state, action) {
   switch (action.type) {
+    case 'SET_MODE': {
+      return {
+        ...state,
+        mode: action.payload.mode,
+        aiRole: action.payload.aiRole || state.aiRole,
+        selectedNode: null,
+        validMoves: [],
+      };
+    }
+
+    case 'SET_ROOM': {
+      return {
+        ...state,
+        roomName: action.payload.roomName,
+        selectedNode: null,
+        validMoves: [],
+      };
+    }
+
+    case 'SYNC_SERVER_STATE': {
+      const serverState = action.payload;
+      if (!serverState) return state;
+
+      let validMoves = state.validMoves;
+      if (state.selectedNode !== null) {
+        validMoves = getValidMovesForNode(
+          serverState.board,
+          state.selectedNode,
+          serverState.game_phase,
+          serverState.current_turn
+        );
+      }
+
+      return {
+        ...state,
+        board: serverState.board,
+        gamePhase: serverState.game_phase,
+        currentTurn: serverState.current_turn,
+        unplacedSheep: serverState.unplaced_sheep,
+        capturedSheep: serverState.captured_sheep,
+        gameStatus: serverState.game_status,
+        moveHistory: serverState.move_history || [],
+        validMoves,
+      };
+    }
+
     case 'SELECT_NODE': {
       const { nodeId } = action.payload;
-
-      // Ignore selection if game is over
       if (state.gameStatus !== 'IN_PROGRESS') return state;
 
       const piece = state.board[nodeId];
 
-      // Clicking an empty node during PLACEMENT when Sheep turn => Place Sheep!
+      // Local Placement Phase
       if (
         state.gamePhase === 'PLACEMENT' &&
         state.currentTurn === 'SHEEP' &&
         piece === null
       ) {
-        const newBoard = [...state.board];
-        newBoard[nodeId] = 'SHEEP';
-
-        const remainingReserve = state.unplacedSheep - 1;
-        const nextPhase = remainingReserve === 0 ? 'MOVEMENT' : 'PLACEMENT';
-        const nextTurn = 'LION';
-
-        const nextStatus = evaluateGameStatus(newBoard, remainingReserve, state.capturedSheep);
-
-        return {
-          ...state,
-          board: newBoard,
-          unplacedSheep: remainingReserve,
-          gamePhase: nextPhase,
-          currentTurn: nextTurn,
-          selectedNode: null,
-          validMoves: [],
-          gameStatus: nextStatus,
-          moveHistory: [
-            ...state.moveHistory,
-            { type: 'PLACE', piece: 'SHEEP', to: nodeId, turn: 'SHEEP' },
-          ],
-        };
+        const moveObj = { type: 'PLACE', from: null, to: nodeId };
+        return applyLocalMove(state, moveObj);
       }
 
-      // If clicking current player's piece, toggle selection and compute valid moves
+      // Select piece
       if (piece === state.currentTurn) {
-        // Toggle off if already selected
         if (state.selectedNode === nodeId) {
           return { ...state, selectedNode: null, validMoves: [] };
         }
-
         const validMoves = getValidMovesForNode(
           state.board,
           nodeId,
           state.gamePhase,
           state.currentTurn
         );
-
-        return {
-          ...state,
-          selectedNode: nodeId,
-          validMoves,
-        };
+        return { ...state, selectedNode: nodeId, validMoves };
       }
 
-      // If clicking a valid target node while a piece is selected => Execute Move
+      // Move execution
       if (state.selectedNode !== null) {
         const targetMove = state.validMoves.find((m) => m.to === nodeId);
         if (targetMove) {
-          return executeMoveHelper(state, state.selectedNode, targetMove);
+          return applyLocalMove(state, targetMove);
         }
       }
 
-      // Default deselect
-      return { ...state, selectedNode: null, validMoves: [] };
-    }
-
-    case 'EXECUTE_MOVE': {
-      const { from, targetMove } = action.payload;
-      return executeMoveHelper(state, from, targetMove);
-    }
-
-    case 'DESELECT': {
       return { ...state, selectedNode: null, validMoves: [] };
     }
 
     case 'RESET_GAME': {
       return {
-        ...initialState,
+        ...state,
         board: createInitialBoard(),
+        currentTurn: 'SHEEP',
+        gamePhase: 'PLACEMENT',
+        unplacedSheep: TOTAL_SHEEP_RESERVE,
+        capturedSheep: 0,
+        selectedNode: null,
+        validMoves: [],
+        gameStatus: 'IN_PROGRESS',
+        moveHistory: [],
       };
     }
 
@@ -115,50 +133,94 @@ function gameReducer(state, action) {
   }
 }
 
-// Helper to update board state after a move or capture
-function executeMoveHelper(state, from, targetMove) {
+function applyLocalMove(state, targetMove) {
   const newBoard = [...state.board];
-  const movingPiece = newBoard[from];
+  let newUnplaced = state.unplacedSheep;
+  let newCaptured = state.capturedSheep;
+  let nextPhase = state.gamePhase;
 
-  newBoard[from] = null;
-  newBoard[targetMove.to] = movingPiece;
+  if (targetMove.type === 'PLACE') {
+    newBoard[targetMove.to] = 'SHEEP';
+    newUnplaced -= 1;
+    if (newUnplaced === 0) nextPhase = 'MOVEMENT';
+  } else if (targetMove.type === 'MOVE' || targetMove.type === 'CAPTURE') {
+    const movingPiece = newBoard[targetMove.from];
+    newBoard[targetMove.from] = null;
+    newBoard[targetMove.to] = movingPiece;
 
-  let newCapturedCount = state.capturedSheep;
-  if (targetMove.type === 'CAPTURE' && targetMove.capturedNode !== undefined) {
-    newBoard[targetMove.capturedNode] = null; // Remove captured sheep
-    newCapturedCount += 1;
+    if (targetMove.type === 'CAPTURE' && targetMove.capturedNode !== undefined) {
+      newBoard[targetMove.capturedNode] = null;
+      newCaptured += 1;
+    }
   }
 
   const nextTurn = state.currentTurn === 'SHEEP' ? 'LION' : 'SHEEP';
-  const nextStatus = evaluateGameStatus(newBoard, state.unplacedSheep, newCapturedCount);
+  const nextStatus = evaluateGameStatus(newBoard, newUnplaced, newCaptured);
 
   return {
     ...state,
     board: newBoard,
-    capturedSheep: newCapturedCount,
+    gamePhase: nextPhase,
     currentTurn: nextTurn,
+    unplacedSheep: newUnplaced,
+    capturedSheep: newCaptured,
+    gameStatus: nextStatus,
     selectedNode: null,
     validMoves: [],
-    gameStatus: nextStatus,
     moveHistory: [
       ...state.moveHistory,
-      {
-        type: targetMove.type,
-        piece: movingPiece,
-        from,
-        to: targetMove.to,
-        capturedNode: targetMove.capturedNode,
-        turn: state.currentTurn,
-      },
+      { ...targetMove, piece: state.currentTurn },
     ],
   };
 }
 
 export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
+  const { isConnected, serverState, sendAction } = useWebSocket(state.roomName);
+
+  // Sync server state when connected in PVP or PVAI mode
+  useEffect(() => {
+    if ((state.mode === 'PVP' || state.mode === 'PVAI') && serverState) {
+      dispatch({ type: 'SYNC_SERVER_STATE', payload: serverState });
+    }
+  }, [serverState, state.mode]);
+
+  // Dispatch helper wrapping local reducer or server WebSocket calls
+  const enhancedDispatch = (action) => {
+    if ((state.mode === 'PVP' || state.mode === 'PVAI') && isConnected) {
+      if (action.type === 'SELECT_NODE') {
+        const { nodeId } = action.payload;
+        // Compute valid move or execute
+        if (state.selectedNode !== null) {
+          const targetMove = state.validMoves.find((m) => m.to === nodeId);
+          if (targetMove) {
+            sendAction('MAKE_MOVE', { move: targetMove });
+            dispatch({ type: 'SELECT_NODE', payload: action.payload });
+            return;
+          }
+        }
+        if (state.gamePhase === 'PLACEMENT' && state.currentTurn === 'SHEEP' && state.board[nodeId] === null) {
+          sendAction('MAKE_MOVE', { move: { type: 'PLACE', from: null, to: nodeId } });
+          return;
+        }
+      } else if (action.type === 'SET_MODE') {
+        sendAction('SELECT_MODE', { mode: action.payload.mode, ai_role: action.payload.aiRole || 'LION' });
+      } else if (action.type === 'RESET_GAME') {
+        sendAction('RESET_GAME');
+      }
+    }
+    dispatch(action);
+  };
 
   return (
-    <GameStateContext.Provider value={{ state, dispatch }}>
+    <GameStateContext.Provider
+      value={{
+        state,
+        dispatch: enhancedDispatch,
+        isConnected,
+        serverState,
+      }}
+    >
       {children}
     </GameStateContext.Provider>
   );
