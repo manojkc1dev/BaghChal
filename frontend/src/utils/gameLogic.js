@@ -125,6 +125,7 @@ export function getValidMovesForNode(board, fromNode, gamePhase, currentTurn) {
     if (targetPiece === null) {
       validMoves.push({
         type: 'MOVE',
+        from: fromNode,
         to: neighborId,
       });
     }
@@ -146,6 +147,7 @@ export function getValidMovesForNode(board, fromNode, gamePhase, currentTurn) {
         if (jumpedNeighbors.includes(landingNode) && board[landingNode] === null) {
           validMoves.push({
             type: 'CAPTURE',
+            from: fromNode,
             to: landingNode,
             capturedNode: neighborId,
           });

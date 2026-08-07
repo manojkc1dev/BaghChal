@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGameState } from '../context/GameStateContext';
+import { useGameState } from '../hooks/useGameState';
 import { WINNING_CAPTURES, TOTAL_SHEEP_RESERVE } from '../utils/gameLogic';
 import { Cpu, Users, Monitor, Wifi, WifiOff } from 'lucide-react';
 
@@ -12,7 +12,6 @@ export default function Scoreboard() {
     unplacedSheep,
     capturedSheep,
     gameStatus,
-    roomName,
   } = state;
 
   const placedSheep = TOTAL_SHEEP_RESERVE - unplacedSheep;

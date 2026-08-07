@@ -37,3 +37,12 @@ staticfiles/
 venv/
 env/
 ENV/
+
+
+#md files
+ARCHITECTURE.md
+CHANGELOG.md
+PROJECT_RULES.md
+TASKS.md
+DECISIONS.md
+GAME_RULES.md

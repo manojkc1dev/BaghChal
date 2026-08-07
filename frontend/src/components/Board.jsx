@@ -1,6 +1,6 @@
 import React from 'react';
 import Node from './Node';
-import { useGameState } from '../context/GameStateContext';
+import { useGameState } from '../hooks/useGameState';
 import { nodeToCoord, TOTAL_NODES } from '../utils/gameLogic';
 
 /**

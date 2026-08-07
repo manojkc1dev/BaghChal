@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useGameState } from '../context/GameStateContext';
+import { useGameState } from '../hooks/useGameState';
 import { RotateCcw, HelpCircle, X, ShieldAlert } from 'lucide-react';
 
 export default function Controls() {

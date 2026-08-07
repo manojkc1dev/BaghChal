@@ -1,5 +1,5 @@
-import React from 'react';
-import { GameProvider, useGameState } from './context/GameStateContext';
+import { GameProvider } from './context/GameStateContext';
+import { useGameState } from './hooks/useGameState';
 import Board from './components/Board';
 import Scoreboard from './components/Scoreboard';
 import Controls from './components/Controls';

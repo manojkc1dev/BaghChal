@@ -27,7 +27,7 @@ export function useWebSocket(roomName = 'default_room') {
         }
       };
 
-      socket.onerror = (err) => {
+      socket.onerror = (_err) => {
         setConnectionError('WebSocket connection error');
         setIsConnected(false);
       };

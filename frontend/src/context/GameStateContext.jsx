@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useReducer, useEffect } from 'react';
 import {
   createInitialBoard,
   getValidMovesForNode,
@@ -226,10 +226,6 @@ export function GameProvider({ children }) {
   );
 }
 
-export function useGameState() {
-  const context = useContext(GameStateContext);
-  if (!context) {
-    throw new Error('useGameState must be used within a GameProvider');
-  }
-  return context;
-}
+export { GameStateContext };
+
+
