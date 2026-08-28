@@ -1,9 +1,28 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: bheedchaal-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bheedchaal}
+      POSTGRES_USER: ${POSTGRES_USER:-bheedchaal_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bheedchaal_secure_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bheedchaal_user} -d ${POSTGRES_DB:-bheedchaal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: bheedchaal-redis
+    restart: always
     ports:
       - "6379:6379"
     healthcheck:
@@ -11,3 +30,36 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bheedchaal-web
+    restart: always
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             daphne -b 0.0.0.0 -p 8000 core.asgi:application"
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "${DEBUG:-False}"
+      SECRET_KEY: "${SECRET_KEY:-change-me-to-a-secure-random-secret-key-in-production}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,web}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-bheedchaal_user}:${POSTGRES_PASSWORD:-bheedchaal_secure_pass}@postgres:5432/${POSTGRES_DB:-bheedchaal}"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
