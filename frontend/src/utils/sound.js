@@ -46,7 +46,7 @@ export function playMoveSound() {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
-  } catch (_e) {
+  } catch {
     // Ignore audio autoplay policies if blocked
   }
 }
@@ -72,7 +72,7 @@ export function playCaptureSound() {
 
     osc.start();
     osc.stop(ctx.currentTime + 0.15);
-  } catch (_e) {
+  } catch {
     // Ignore error
   }
 }
@@ -100,7 +100,7 @@ export function playVictorySound() {
       osc.start(ctx.currentTime + idx * 0.12);
       osc.stop(ctx.currentTime + idx * 0.12 + 0.3);
     });
-  } catch (_e) {
+  } catch {
     // Ignore error
   }
 }

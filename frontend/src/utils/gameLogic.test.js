@@ -5,7 +5,6 @@ import {
   areLionsTrapped,
   evaluateGameStatus,
   TOTAL_NODES,
-  TOTAL_SHEEP_RESERVE,
   WINNING_CAPTURES,
   isDiagonalNode,
   ADJACENCY_LIST,
