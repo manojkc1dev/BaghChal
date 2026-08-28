@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameState } from '../hooks/useGameState';
 import { RotateCcw, HelpCircle, X, ShieldAlert } from 'lucide-react';
+import { WINNING_CAPTURES } from '../utils/gameLogic';
 
 export default function Controls() {
   const { dispatch } = useGameState();
@@ -80,7 +81,7 @@ export default function Controls() {
               <div>
                 <strong className="text-amber-400">4. Winning Conditions:</strong>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-slate-400">
-                  <li><strong className="text-slate-200">Lions Win:</strong> Capture 5 sheep.</li>
+                  <li><strong className="text-slate-200">Lions Win:</strong> Capture {WINNING_CAPTURES} sheep.</li>
                   <li><strong className="text-slate-200">Sheep Win:</strong> Surround all 4 Lions so they have 0 valid moves or jumps.</li>
                 </ul>
               </div>

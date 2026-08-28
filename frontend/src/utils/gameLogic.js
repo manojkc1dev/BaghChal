@@ -14,7 +14,7 @@
 export const BOARD_SIZE = 5;
 export const TOTAL_NODES = 25;
 export const TOTAL_SHEEP_RESERVE = 20;
-export const WINNING_CAPTURES = 5;
+export const WINNING_CAPTURES = 5; // Lions win by capturing 5 sheep (traditional Bagh-Chal rule)
 
 export const INITIAL_LION_POSITIONS = [0, 4, 20, 24]; // 4 outer corners
 
@@ -160,17 +160,22 @@ export function getValidMovesForNode(board, fromNode, gamePhase, currentTurn) {
 }
 
 /**
- * Check if all Lions on the board have 0 available moves or captures
+ * Check if all Lions on the board have 0 available moves or captures.
+ * Lions are always evaluated in MOVEMENT phase context for trap detection.
  */
 export function areLionsTrapped(board) {
+  let lionCount = 0;
   for (let id = 0; id < TOTAL_NODES; id++) {
     if (board[id] === 'LION') {
+      lionCount++;
       const moves = getValidMovesForNode(board, id, 'MOVEMENT', 'LION');
       if (moves.length > 0) {
         return false; // At least one lion can move or capture
       }
     }
   }
+  // If no lions on board somehow, they're not "trapped"
+  if (lionCount === 0) return false;
   return true; // All lions trapped
 }
 

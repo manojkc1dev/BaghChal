@@ -83,8 +83,8 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Redis Channel Layer Configuration (InMemory fallback for test runner)
-if 'test' in sys.argv:
+# Redis Channel Layer Configuration (InMemory fallback for test runner / local dev without redis)
+if 'test' in sys.argv or 'pytest' in sys.argv[0] or os.environ.get("USE_INMEMORY_CHANNEL_LAYER") == "true":
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels.layers.InMemoryChannelLayer",

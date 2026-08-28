@@ -13,8 +13,20 @@ from .logic import (
 )
 
 class BheedChaalBot:
-    def __init__(self, depth=3):
-        self.depth = depth
+    def __init__(self, difficulty='MEDIUM', depth=None):
+        self.difficulty = difficulty.upper() if isinstance(difficulty, str) else 'MEDIUM'
+        self.override_depth = depth
+
+    def _get_depth(self, diff=None):
+        if self.override_depth is not None:
+            return self.override_depth
+        d = (diff or self.difficulty).upper()
+        if d == 'EASY':
+            return 1
+        elif d == 'HARD':
+            return 4
+        return 2  # MEDIUM default
+
 
     def evaluate_board(self, board, game_phase, unplaced_sheep, captured_sheep):
         """
@@ -91,15 +103,28 @@ class BheedChaalBot:
                     break # Alpha-Beta Cutoff
             return min_eval, best_move
 
-    def get_best_move(self, board, game_phase, current_turn, unplaced_sheep, captured_sheep):
+    def get_best_move(self, board, game_phase, current_turn, unplaced_sheep, captured_sheep, difficulty=None):
+        diff = (difficulty or self.difficulty).upper()
+        valid_moves = get_all_valid_moves(board, game_phase, current_turn, unplaced_sheep)
+
+        if not valid_moves:
+            return None
+
+        # Easy Mode: 40% chance of casual random move, otherwise depth 1
+        if diff == 'EASY' and random.random() < 0.40:
+            return random.choice(valid_moves)
+
+        depth = 1 if diff == 'EASY' else (4 if diff == 'HARD' else 2)
+
         _, best_move = self.minimax(
             board=board,
             game_phase=game_phase,
             current_turn=current_turn,
             unplaced_sheep=unplaced_sheep,
             captured_sheep=captured_sheep,
-            depth=self.depth,
+            depth=depth,
             alpha=-math.inf,
             beta=math.inf,
         )
-        return best_move
+        return best_move or random.choice(valid_moves)
+

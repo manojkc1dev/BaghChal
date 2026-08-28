@@ -5,7 +5,7 @@ BheedChaal (Bagh-Chal) Server-Authoritative Logic Engine
 BOARD_SIZE = 5
 TOTAL_NODES = 25
 TOTAL_SHEEP_RESERVE = 20
-WINNING_CAPTURES = 5
+WINNING_CAPTURES = 5  # Lions win by capturing 5 sheep (traditional Bagh-Chal rule)
 
 INITIAL_LION_POSITIONS = [0, 4, 20, 24]
 
@@ -121,11 +121,16 @@ def get_all_valid_moves(board, game_phase, current_turn, unplaced_sheep):
     return moves
 
 def are_lions_trapped(board):
+    lion_count = 0
     for node_id in range(TOTAL_NODES):
         if board[node_id] == 'LION':
+            lion_count += 1
             moves = get_valid_moves_for_node(board, node_id, 'MOVEMENT', 'LION')
             if len(moves) > 0:
                 return False
+    # If no lions on board, they're not "trapped"
+    if lion_count == 0:
+        return False
     return True
 
 def evaluate_game_status(board, unplaced_sheep, captured_sheep):
@@ -160,12 +165,70 @@ def apply_move(board, game_phase, current_turn, unplaced_sheep, captured_sheep, 
         new_board[to_node] = moving_piece
 
         if move_type == 'CAPTURE':
-            captured_node = move.get('captured_node')
-            if captured_node is not None:
+            r1, c1 = node_to_coord(from_node)
+            r3, c3 = node_to_coord(to_node)
+            mid_r, mid_c = (r1 + r3) // 2, (c1 + c3) // 2
+            captured_node = coord_to_node(mid_r, mid_c)
+            if captured_node is not None and new_board[captured_node] == 'SHEEP':
                 new_board[captured_node] = None
                 new_captured += 1
 
     next_turn = 'LION' if current_turn == 'SHEEP' else 'SHEEP'
     next_status = evaluate_game_status(new_board, new_unplaced, new_captured)
 
+    # Enforce invariants on new state
+    validate_game_invariants(new_board, next_phase, next_turn, new_unplaced, new_captured, next_status)
+
     return new_board, next_phase, next_turn, new_unplaced, new_captured, next_status
+
+def validate_game_invariants(board, game_phase, current_turn, unplaced_sheep, captured_sheep, game_status):
+    """
+    Validates all state invariants required for server-authoritative engine correctness.
+    Raises ValueError if any invariant is violated.
+    """
+    if len(board) != TOTAL_NODES:
+        raise ValueError(f"Board size must be {TOTAL_NODES}, got {len(board)}")
+
+    lion_count = sum(1 for p in board if p == 'LION')
+    if lion_count != 4:
+        raise ValueError(f"Exactly 4 lions required on board, found {lion_count}")
+
+    sheep_on_board = sum(1 for p in board if p == 'SHEEP')
+    if unplaced_sheep < 0 or unplaced_sheep > TOTAL_SHEEP_RESERVE:
+        raise ValueError(f"Unplaced sheep reserve must be between 0 and {TOTAL_SHEEP_RESERVE}, got {unplaced_sheep}")
+
+    if captured_sheep < 0 or captured_sheep > TOTAL_SHEEP_RESERVE:
+        raise ValueError(f"Captured sheep count must be between 0 and {TOTAL_SHEEP_RESERVE}, got {captured_sheep}")
+
+    # In PLACEMENT phase, total sheep across board, reserve, and captured must equal 20
+    if game_phase == 'PLACEMENT':
+        if sheep_on_board + unplaced_sheep + captured_sheep != TOTAL_SHEEP_RESERVE:
+            raise ValueError(
+                f"Placement phase invariant violated: on_board({sheep_on_board}) + unplaced({unplaced_sheep}) + "
+                f"captured({captured_sheep}) != {TOTAL_SHEEP_RESERVE}"
+            )
+    else:
+        if sheep_on_board + captured_sheep != TOTAL_SHEEP_RESERVE:
+            raise ValueError(
+                f"Movement phase invariant violated: on_board({sheep_on_board}) + captured({captured_sheep}) != {TOTAL_SHEEP_RESERVE}"
+            )
+
+
+
+    if current_turn not in ['SHEEP', 'LION']:
+        raise ValueError(f"Invalid current turn: {current_turn}")
+
+    if game_phase not in ['PLACEMENT', 'MOVEMENT']:
+        raise ValueError(f"Invalid game phase: {game_phase}")
+
+    if game_phase == 'PLACEMENT' and unplaced_sheep == 0:
+        raise ValueError("Game phase cannot be PLACEMENT when unplaced_sheep is 0")
+
+    if game_phase == 'MOVEMENT' and unplaced_sheep > 0:
+        raise ValueError("Game phase cannot be MOVEMENT when unplaced_sheep > 0")
+
+    if game_status not in ['IN_PROGRESS', 'LIONS_WON', 'SHEEP_WON']:
+        raise ValueError(f"Invalid game status: {game_status}")
+
+    return True
+

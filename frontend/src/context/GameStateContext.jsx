@@ -6,12 +6,14 @@ import {
   TOTAL_SHEEP_RESERVE,
 } from '../utils/gameLogic';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { playMoveSound, playCaptureSound, playVictorySound } from '../utils/sound';
 
 const GameStateContext = createContext(null);
 
 const initialState = {
   mode: 'LOCAL', // 'LOCAL' | 'PVAI' | 'PVP'
   aiRole: 'LION', // 'LION' | 'SHEEP' (AI plays as Lion by default in PVAI)
+  aiDifficulty: 'MEDIUM', // 'EASY' | 'MEDIUM' | 'HARD'
   roomName: 'room-1',
   board: createInitialBoard(),
   currentTurn: 'SHEEP',
@@ -31,8 +33,16 @@ function gameReducer(state, action) {
         ...state,
         mode: action.payload.mode,
         aiRole: action.payload.aiRole || state.aiRole,
+        aiDifficulty: action.payload.aiDifficulty || state.aiDifficulty,
         selectedNode: null,
         validMoves: [],
+      };
+    }
+
+    case 'SET_DIFFICULTY': {
+      return {
+        ...state,
+        aiDifficulty: action.payload.aiDifficulty,
       };
     }
 
@@ -59,6 +69,20 @@ function gameReducer(state, action) {
         );
       }
 
+      // Play sound on server update if move count changed
+      if (serverState.move_history && serverState.move_history.length > state.moveHistory.length) {
+        const lastMove = serverState.move_history[serverState.move_history.length - 1];
+        if (lastMove && lastMove.type === 'CAPTURE') {
+          playCaptureSound();
+        } else {
+          playMoveSound();
+        }
+      }
+
+      if (serverState.game_status !== 'IN_PROGRESS' && state.gameStatus === 'IN_PROGRESS') {
+        playVictorySound();
+      }
+
       return {
         ...state,
         board: serverState.board,
@@ -67,6 +91,7 @@ function gameReducer(state, action) {
         unplacedSheep: serverState.unplaced_sheep,
         capturedSheep: serverState.captured_sheep,
         gameStatus: serverState.game_status,
+        aiDifficulty: serverState.ai_difficulty || state.aiDifficulty,
         moveHistory: serverState.move_history || [],
         validMoves,
       };
@@ -143,6 +168,7 @@ function applyLocalMove(state, targetMove) {
     newBoard[targetMove.to] = 'SHEEP';
     newUnplaced -= 1;
     if (newUnplaced === 0) nextPhase = 'MOVEMENT';
+    playMoveSound();
   } else if (targetMove.type === 'MOVE' || targetMove.type === 'CAPTURE') {
     const movingPiece = newBoard[targetMove.from];
     newBoard[targetMove.from] = null;
@@ -151,11 +177,18 @@ function applyLocalMove(state, targetMove) {
     if (targetMove.type === 'CAPTURE' && targetMove.capturedNode !== undefined) {
       newBoard[targetMove.capturedNode] = null;
       newCaptured += 1;
+      playCaptureSound();
+    } else {
+      playMoveSound();
     }
   }
 
   const nextTurn = state.currentTurn === 'SHEEP' ? 'LION' : 'SHEEP';
   const nextStatus = evaluateGameStatus(newBoard, newUnplaced, newCaptured);
+
+  if (nextStatus !== 'IN_PROGRESS') {
+    playVictorySound();
+  }
 
   return {
     ...state,
@@ -190,7 +223,7 @@ export function GameProvider({ children }) {
     if ((state.mode === 'PVP' || state.mode === 'PVAI') && isConnected) {
       if (action.type === 'SELECT_NODE') {
         const { nodeId } = action.payload;
-        // Compute valid move or execute
+        // If a move is already selected and this is a valid target, send to server
         if (state.selectedNode !== null) {
           const targetMove = state.validMoves.find((m) => m.to === nodeId);
           if (targetMove) {
@@ -199,13 +232,29 @@ export function GameProvider({ children }) {
             return;
           }
         }
+        // Placement phase: send to server and update local state optimistically
         if (state.gamePhase === 'PLACEMENT' && state.currentTurn === 'SHEEP' && state.board[nodeId] === null) {
           sendAction('MAKE_MOVE', { move: { type: 'PLACE', from: null, to: nodeId } });
+          dispatch({ type: 'SELECT_NODE', payload: action.payload }); // update local state too
           return;
         }
+        // Otherwise (selecting a piece), just update local selection
+        dispatch(action);
+        return;
       } else if (action.type === 'SET_MODE') {
-        sendAction('SELECT_MODE', { mode: action.payload.mode, ai_role: action.payload.aiRole || 'LION' });
+        sendAction('SELECT_MODE', {
+          mode: action.payload.mode,
+          ai_role: action.payload.aiRole || 'LION',
+          ai_difficulty: action.payload.aiDifficulty || state.aiDifficulty,
+        });
+      } else if (action.type === 'SET_DIFFICULTY') {
+        sendAction('SELECT_MODE', {
+          mode: state.mode,
+          ai_role: state.aiRole,
+          ai_difficulty: action.payload.aiDifficulty,
+        });
       } else if (action.type === 'RESET_GAME') {
+
         sendAction('RESET_GAME');
       }
     }
