@@ -272,14 +272,18 @@ export default function Scoreboard() {
           </div>
         </div>
 
-        {/* Game status inline hint bar */}
+        {/* Game status inline hint & AI thinking banner */}
         {!isGameOver && (
-          <div className={`rounded-xl px-3 py-2 text-xs font-medium text-center border ${
-            currentTurn === 'SHEEP'
+          <div className={`rounded-xl px-3 py-2 text-xs font-medium text-center border transition-all ${
+            mode === 'PVAI' && currentTurn === state.aiRole
+              ? 'bg-purple-500/20 border-purple-500/40 text-purple-200 animate-pulse'
+              : currentTurn === 'SHEEP'
               ? 'bg-sky-500/10 border-sky-500/30 text-sky-300'
               : 'bg-red-500/10 border-red-500/30 text-red-300'
           }`}>
-            {gamePhase === 'PLACEMENT' && currentTurn === 'SHEEP'
+            {mode === 'PVAI' && currentTurn === state.aiRole
+              ? `🤖 AI Bot is thinking... (${state.aiDifficulty} difficulty)`
+              : gamePhase === 'PLACEMENT' && currentTurn === 'SHEEP'
               ? '🐑 Click any empty node to place a sheep'
               : currentTurn === 'SHEEP'
               ? '🐑 Click a sheep to select, then click a highlighted node to move'

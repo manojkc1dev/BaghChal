@@ -7,6 +7,7 @@ import {
 } from '../utils/gameLogic';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { playMoveSound, playCaptureSound, playVictorySound } from '../utils/sound';
+import { getBestAiMove } from '../utils/aiLogic';
 
 const GameStateContext = createContext(null);
 
@@ -32,10 +33,17 @@ function gameReducer(state, action) {
       return {
         ...state,
         mode: action.payload.mode,
-        aiRole: action.payload.aiRole || state.aiRole,
+        aiRole: action.payload.aiRole || 'LION',
         aiDifficulty: action.payload.aiDifficulty || state.aiDifficulty,
+        board: createInitialBoard(),
+        currentTurn: 'SHEEP',
+        gamePhase: 'PLACEMENT',
+        unplacedSheep: TOTAL_SHEEP_RESERVE,
+        capturedSheep: 0,
         selectedNode: null,
         validMoves: [],
+        gameStatus: 'IN_PROGRESS',
+        moveHistory: [],
       };
     }
 
@@ -138,6 +146,11 @@ function gameReducer(state, action) {
       return { ...state, selectedNode: null, validMoves: [] };
     }
 
+    case 'EXECUTE_AI_MOVE': {
+      if (state.gameStatus !== 'IN_PROGRESS') return state;
+      return applyLocalMove(state, action.payload.move);
+    }
+
     case 'RESET_GAME': {
       return {
         ...state,
@@ -152,6 +165,9 @@ function gameReducer(state, action) {
         moveHistory: [],
       };
     }
+
+    case 'FORCE_UPDATE':
+      return { ...state };
 
     default:
       return state;
@@ -218,6 +234,42 @@ export function GameProvider({ children }) {
     }
   }, [serverState, state.mode]);
 
+  // Offline AI Bot turn trigger fallback
+  useEffect(() => {
+    if (
+      state.mode === 'PVAI' &&
+      state.gameStatus === 'IN_PROGRESS' &&
+      state.currentTurn === state.aiRole &&
+      !isConnected
+    ) {
+      const timer = setTimeout(() => {
+        const aiMove = getBestAiMove(
+          state.board,
+          state.gamePhase,
+          state.currentTurn,
+          state.unplacedSheep,
+          state.capturedSheep,
+          state.aiDifficulty
+        );
+        if (aiMove) {
+          dispatch({ type: 'EXECUTE_AI_MOVE', payload: { move: aiMove } });
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    state.mode,
+    state.gameStatus,
+    state.currentTurn,
+    state.aiRole,
+    state.aiDifficulty,
+    isConnected,
+    state.board,
+    state.gamePhase,
+    state.unplacedSheep,
+    state.capturedSheep,
+  ]);
+
   // Dispatch helper wrapping local reducer or server WebSocket calls
   const enhancedDispatch = (action) => {
     if ((state.mode === 'PVP' || state.mode === 'PVAI') && isConnected) {
@@ -235,10 +287,9 @@ export function GameProvider({ children }) {
         // Placement phase: send to server and update local state optimistically
         if (state.gamePhase === 'PLACEMENT' && state.currentTurn === 'SHEEP' && state.board[nodeId] === null) {
           sendAction('MAKE_MOVE', { move: { type: 'PLACE', from: null, to: nodeId } });
-          dispatch({ type: 'SELECT_NODE', payload: action.payload }); // update local state too
+          dispatch({ type: 'SELECT_NODE', payload: action.payload });
           return;
         }
-        // Otherwise (selecting a piece), just update local selection
         dispatch(action);
         return;
       } else if (action.type === 'SET_MODE') {
@@ -254,7 +305,6 @@ export function GameProvider({ children }) {
           ai_difficulty: action.payload.aiDifficulty,
         });
       } else if (action.type === 'RESET_GAME') {
-
         sendAction('RESET_GAME');
       }
     }
@@ -276,5 +326,3 @@ export function GameProvider({ children }) {
 }
 
 export { GameStateContext };
-
-

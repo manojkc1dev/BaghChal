@@ -52,19 +52,32 @@ describe('Bagh-Chal Game Logic Tests (Frontend)', () => {
     expect(moves.length).toBe(0);
   });
 
-  it('allows lion step moves and jump captures', () => {
+  it('allows lion step moves and jump captures with distinct move types', () => {
     const board = Array(25).fill(null);
     board[0] = 'LION';
     board[1] = 'SHEEP'; // adjacent sheep
     // Node 2 is empty
 
     const moves = getValidMovesForNode(board, 0, 'PLACEMENT', 'LION');
-    // Step move to 5 (down), step move to 6 (diag down-right), capture to 2 over 1
     const captureMove = moves.find((m) => m.type === 'CAPTURE');
+    const stepMove = moves.find((m) => m.type === 'MOVE');
+
     expect(captureMove).toBeDefined();
     expect(captureMove.from).toBe(0);
     expect(captureMove.to).toBe(2);
     expect(captureMove.capturedNode).toBe(1);
+
+    expect(stepMove).toBeDefined();
+    expect([5, 6]).toContain(stepMove.to);
+  });
+
+  it('generates valid moves strictly for the selected node', () => {
+    const board = createInitialBoard();
+    const cornerLionMoves = getValidMovesForNode(board, 0, 'MOVEMENT', 'LION');
+    const emptyNodeMoves = getValidMovesForNode(board, 1, 'MOVEMENT', 'LION');
+
+    expect(cornerLionMoves.length).toBeGreaterThan(0);
+    expect(emptyNodeMoves.length).toBe(0); // empty node has 0 moves
   });
 
   it('detects game over when lions reach WINNING_CAPTURES', () => {
@@ -75,18 +88,14 @@ describe('Bagh-Chal Game Logic Tests (Frontend)', () => {
 
   it('detects game over when all lions are trapped', () => {
     const board = Array(25).fill(null);
-    // Surround corner lion at node 0
     board[0] = 'LION';
     board[1] = 'SHEEP';
     board[5] = 'SHEEP';
     board[6] = 'SHEEP';
-    // Block jump landing spots (2, 10, 12)
     board[2] = 'SHEEP';
     board[10] = 'SHEEP';
     board[12] = 'SHEEP';
 
-    // Surround other corner lions similarly or clear them
-    // areLionsTrapped returns true if all lions on board have no legal moves
     expect(areLionsTrapped(board)).toBe(true);
     expect(evaluateGameStatus(board, 0, 0)).toBe('SHEEP_WON');
   });

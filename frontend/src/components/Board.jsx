@@ -25,9 +25,16 @@ function getCoordPx(r, c) {
 
 export default function Board() {
   const { state, dispatch } = useGameState();
-  const { board, selectedNode, validMoves, gamePhase, currentTurn } = state;
+  const { board, selectedNode, validMoves, gamePhase, currentTurn, mode, aiRole, gameStatus } = state;
+
+  const isHumanTurn =
+    gameStatus === 'IN_PROGRESS' &&
+    (mode === 'LOCAL' || (mode === 'PVAI' && currentTurn !== aiRole) || mode === 'PVP');
+
+  const displayValidMoves = (selectedNode !== null && isHumanTurn) ? validMoves : [];
 
   const handleNodeClick = (nodeId) => {
+    if (!isHumanTurn) return;
     dispatch({ type: 'SELECT_NODE', payload: { nodeId } });
   };
 
@@ -146,7 +153,7 @@ export default function Board() {
           {nodePositions.map((pos) => {
             const piece = board[pos.id];
             const isSelected = selectedNode === pos.id;
-            const targetMove = validMoves.find((m) => m.to === pos.id);
+            const targetMove = displayValidMoves.find((m) => m.to === pos.id);
             const isValidTarget = Boolean(targetMove);
 
             // Convert SVG viewBox % coordinates to CSS percentages
@@ -171,6 +178,7 @@ export default function Board() {
                   onClick={() => handleNodeClick(pos.id)}
                   gamePhase={gamePhase}
                   currentTurn={currentTurn}
+                  isHumanTurn={isHumanTurn}
                 />
               </div>
             );
