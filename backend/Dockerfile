@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -42,4 +42,4 @@ USER appuser
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "python3 manage.py migrate --noinput && daphne -b 0.0.0.0 -p ${PORT:-10000} core.asgi:application"]
+CMD ["sh", "-c", "cd backend && python3 manage.py migrate --noinput && daphne -b 0.0.0.0 -p ${PORT:-10000} core.asgi:application"]
