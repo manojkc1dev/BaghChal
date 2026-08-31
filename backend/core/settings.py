@@ -5,12 +5,30 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security Settings
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-bheedchaal-dev-secret-key-change-in-production')
+# ─── Security Settings ────────────────────────────────────────────────────────
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 'yes']
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
+# Strict SECRET_KEY — must be set via env in production
+_secret = os.environ.get('SECRET_KEY')
+if not _secret:
+    if DEBUG:
+        _secret = 'django-insecure-dev-only-local-key-do-not-use-in-production'
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "CRITICAL: SECRET_KEY environment variable is missing in production. "
+            "Set it via Render environment variables."
+        )
+SECRET_KEY = _secret
 
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', '*').split(',') if host.strip()]
+# Explicit Host Header validation — no wildcard in production
+_allowed_hosts_raw = os.environ.get('ALLOWED_HOSTS', '')
+if _allowed_hosts_raw:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
+elif DEBUG:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+else:
+    ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     # Daphne must be listed before django.contrib.staticfiles for ASGI development
@@ -21,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
@@ -85,33 +103,37 @@ WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Channel Layer Configuration
-IS_TESTING = 'test' in sys.argv or any('pytest' in arg for arg in sys.argv) or os.environ.get("USE_INMEMORY_CHANNEL_LAYER") == "true"
+IS_TESTING = (
+    'test' in sys.argv or
+    any('pytest' in arg for arg in sys.argv) or
+    os.environ.get('USE_INMEMORY_CHANNEL_LAYER') == 'true'
+)
 
 if IS_TESTING:
     CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
 else:
-    redis_url = os.environ.get("REDIS_URL")
+    redis_url = os.environ.get('REDIS_URL')
     if redis_url:
         CHANNEL_LAYERS = {
-            "default": {
-                "BACKEND": "channels_redis.core.RedisChannelLayer",
-                "CONFIG": {
-                    "hosts": [redis_url],
+            'default': {
+                'BACKEND': 'channels_redis.core.RedisChannelLayer',
+                'CONFIG': {
+                    'hosts': [redis_url],
                 },
             },
         }
     else:
-        redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
-        redis_port = int(os.environ.get("REDIS_PORT", 6379))
+        redis_host = os.environ.get('REDIS_HOST', '127.0.0.1')
+        redis_port = int(os.environ.get('REDIS_PORT', 6379))
         CHANNEL_LAYERS = {
-            "default": {
-                "BACKEND": "channels_redis.core.RedisChannelLayer",
-                "CONFIG": {
-                    "hosts": [(redis_host, redis_port)],
+            'default': {
+                'BACKEND': 'channels_redis.core.RedisChannelLayer',
+                'CONFIG': {
+                    'hosts': [(redis_host, redis_port)],
                 },
             },
         }
@@ -137,18 +159,10 @@ else:
     }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 LANGUAGE_CODE = 'en-us'
@@ -161,24 +175,24 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS & CSRF Security Configuration
+# ─── CORS & CSRF Security Configuration ─────────────────────────────────────
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
-    allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
-    if allowed_origins:
-        CORS_ALLOWED_ORIGINS = [origin.strip() for origin in allowed_origins.split(',') if origin.strip()]
+    _allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+    if _allowed_origins:
+        CORS_ALLOWED_ORIGINS = [o.strip() for o in _allowed_origins.split(',') if o.strip()]
     else:
         CORS_ALLOWED_ORIGINS = []
 
-    csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
-    if csrf_origins:
-        CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins.split(',') if origin.strip()]
+    _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+    if _csrf_origins:
+        CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Production Security Headers
+# ─── Production Security Headers ─────────────────────────────────────────────
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ['true', '1']
@@ -187,11 +201,11 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000 # 1 year
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-# Production-safe Logging
+# ─── Logging ──────────────────────────────────────────────────────────────────
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

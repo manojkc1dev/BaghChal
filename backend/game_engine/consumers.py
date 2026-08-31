@@ -1,7 +1,9 @@
 import json
 import asyncio
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from .logic import (
     create_initial_board,
@@ -13,12 +15,16 @@ from .logic import (
 from .ai import BheedChaalBot
 from .models import Game
 
+logger = logging.getLogger('game_engine')
+
 ROOM_LOCKS = {}
+
 
 def get_room_lock(room_name):
     if room_name not in ROOM_LOCKS:
         ROOM_LOCKS[room_name] = asyncio.Lock()
     return ROOM_LOCKS[room_name]
+
 
 @database_sync_to_async
 def get_or_create_game_db(room_name, user):
@@ -51,6 +57,7 @@ def get_or_create_game_db(room_name, user):
 
     return serialize_game(game)
 
+
 @database_sync_to_async
 def set_game_mode_db(room_name, mode, ai_role, ai_difficulty):
     try:
@@ -65,6 +72,7 @@ def set_game_mode_db(room_name, mode, ai_role, ai_difficulty):
         return serialize_game(game)
     except Game.DoesNotExist:
         return None
+
 
 @database_sync_to_async
 def reset_game_db(room_name):
@@ -84,23 +92,24 @@ def reset_game_db(room_name):
     except Game.DoesNotExist:
         return None
 
+
 @database_sync_to_async
 def apply_move_db(room_name, move_data, user):
     with transaction.atomic():
         try:
             game = Game.objects.select_for_update().get(room_name=room_name)
         except Game.DoesNotExist:
-            return None, "Game not found"
+            return None, 'Game not found'
 
         if game.game_status != 'IN_PROGRESS':
-            return None, "Game is already over"
+            return None, 'Game is already over'
 
         # Check turn authorization in Online PVP mode
         if game.mode == 'PVP' and user and user.is_authenticated:
             if game.current_turn == 'SHEEP' and game.player_sheep and game.player_sheep != user:
-                return None, "Not your turn (You are not Sheep player)"
+                return None, 'Not your turn (You are not Sheep player)'
             if game.current_turn == 'LION' and game.player_lion and game.player_lion != user:
-                return None, "Not your turn (You are not Lion player)"
+                return None, 'Not your turn (You are not Lion player)'
 
         # Get server-authoritative valid moves
         valid_moves = get_all_valid_moves(
@@ -121,7 +130,7 @@ def apply_move_db(room_name, move_data, user):
                 break
 
         if not matched_move:
-            return None, "Illegal move"
+            return None, 'Illegal move'
 
         # Apply move authoritatively
         nb, np, nt, nu, nc, nstat = apply_move(
@@ -166,6 +175,7 @@ def apply_move_db(room_name, move_data, user):
         game.save()
         return serialize_game(game), None
 
+
 @database_sync_to_async
 def get_ai_move_db(room_name):
     try:
@@ -187,6 +197,7 @@ def get_ai_move_db(room_name):
         return game, ai_move
     except Game.DoesNotExist:
         return None, None
+
 
 def serialize_game(game):
     return {
@@ -225,10 +236,34 @@ class GameConsumer(AsyncWebsocketConsumer):
         async with lock:
             state = await get_or_create_game_db(self.room_name, self.user)
 
+        # Enforce: PVP mode requires authenticated user
+        if state['mode'] == 'PVP' and (
+            self.user is None or
+            isinstance(self.user, AnonymousUser) or
+            not self.user.is_authenticated
+        ):
+            await self.send(text_data=json.dumps({
+                'type': 'AUTH_REQUIRED',
+                'message': 'Online PVP requires authentication. Please log in to join this game.',
+            }))
+            await self.close(code=4001)
+            return
+
+        # Determine this connection's assigned role in PVP
+        my_role = None
+        if state['mode'] == 'PVP' and self.user and self.user.is_authenticated:
+            username = self.user.username
+            if state['player_sheep'] == username:
+                my_role = 'SHEEP'
+            elif state['player_lion'] == username:
+                my_role = 'LION'
+
         await self.send(text_data=json.dumps({
             'type': 'INIT_STATE',
             'state': state,
             'room': self.room_name,
+            'my_role': my_role,
+            'username': self.user.username if (self.user and self.user.is_authenticated) else None,
         }))
 
     async def disconnect(self, close_code):
@@ -263,7 +298,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                 elif action == 'MAKE_MOVE':
                     move_data = data.get('move')
                     if not move_data:
-                        await self.send_error("Missing move payload")
+                        await self.send_error('Missing move payload')
                         return
 
                     state, err = await apply_move_db(self.room_name, move_data, self.user)
@@ -308,10 +343,21 @@ class GameConsumer(AsyncWebsocketConsumer):
         )
 
     async def game_state_update(self, event):
+        # Determine this connection's role for the broadcast too
+        state = event.get('state', {})
+        my_role = None
+        if self.user and self.user.is_authenticated:
+            username = self.user.username
+            if state.get('player_sheep') == username:
+                my_role = 'SHEEP'
+            elif state.get('player_lion') == username:
+                my_role = 'LION'
+
         await self.send(text_data=json.dumps({
             'type': 'STATE_UPDATE',
             'event_type': event.get('event_type'),
-            'state': event.get('state'),
+            'state': state,
+            'my_role': my_role,
         }))
 
     async def send_error(self, message):
