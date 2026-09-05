@@ -20,7 +20,7 @@ class WebSocketSecurityTest(TestCase):
         self.token_b_str = str(token_b)
 
     async def test_websocket_connect_and_db_init(self):
-        communicator = WebsocketCommunicator(application, "ws/game/test_room_1/")
+        communicator = WebsocketCommunicator(application, f"ws/game/test_room_1/?token={self.token_a_str}")
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
@@ -74,7 +74,7 @@ class WebSocketSecurityTest(TestCase):
 
     async def test_malicious_payload_rejection(self):
         """Client cannot spoof captured count or force game status."""
-        comm = WebsocketCommunicator(application, "ws/game/malicious_room/")
+        comm = WebsocketCommunicator(application, f"ws/game/malicious_room/?token={self.token_a_str}")
         await comm.connect()
         await comm.receive_json_from()
 

@@ -1,11 +1,18 @@
 from django.test import TestCase
+from django.contrib.auth import get_user_model
 from channels.testing import WebsocketCommunicator
-from game_engine.consumers import GameConsumer
+from core.asgi import application
+from rest_framework_simplejwt.tokens import RefreshToken
+
+User = get_user_model()
 
 class GameConsumerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='consumer_tester', password='Pass123!Safe')
+        self.token = str(RefreshToken.for_user(self.user).access_token)
+
     async def test_connect_and_init_state(self):
-        communicator = WebsocketCommunicator(GameConsumer.as_asgi(), "ws/game/test_room/")
-        communicator.scope['url_route'] = {'kwargs': {'room_name': 'test_room'}}
+        communicator = WebsocketCommunicator(application, f"ws/game/test_room/?token={self.token}")
         
         connected, subprotocol = await communicator.connect()
         self.assertTrue(connected)
@@ -20,8 +27,7 @@ class GameConsumerTest(TestCase):
         await communicator.disconnect()
 
     async def test_make_move_action(self):
-        communicator = WebsocketCommunicator(GameConsumer.as_asgi(), "ws/game/test_room_2/")
-        communicator.scope['url_route'] = {'kwargs': {'room_name': 'test_room_2'}}
+        communicator = WebsocketCommunicator(application, f"ws/game/test_room_2/?token={self.token}")
         
         connected, _ = await communicator.connect()
         self.assertTrue(connected)

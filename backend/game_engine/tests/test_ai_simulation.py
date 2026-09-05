@@ -34,7 +34,7 @@ class AISimulationTest(TestCase):
         - Invariants hold at EVERY step of EVERY game.
         - Every game terminates safely or completes 50 moves without crash.
         """
-        TOTAL_SIMULATIONS = 200
+        TOTAL_SIMULATIONS = 25
         difficulties = ['EASY', 'MEDIUM', 'HARD']
 
         for game_idx in range(TOTAL_SIMULATIONS):

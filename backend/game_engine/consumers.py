@@ -101,6 +101,9 @@ def apply_move_db(room_name, move_data, user):
         except Game.DoesNotExist:
             return None, 'Game not found'
 
+        if not isinstance(move_data, dict):
+            return None, 'Invalid move payload format'
+
         if game.game_status != 'IN_PROGRESS':
             return None, 'Game is already over'
 

@@ -5,13 +5,32 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env file if available
+for candidate_env in [BASE_DIR / '.env', BASE_DIR.parent / '.env']:
+    if candidate_env.exists():
+        try:
+            with open(candidate_env, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+        except Exception:
+            pass
+        break
+
 # ─── Security Settings ────────────────────────────────────────────────────────
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 'yes']
+IS_TESTING = (
+    'test' in sys.argv or
+    any('pytest' in arg for arg in sys.argv) or
+    os.environ.get('USE_INMEMORY_CHANNEL_LAYER') == 'true'
+)
 
 # Strict SECRET_KEY — must be set via env in production
 _secret = os.environ.get('SECRET_KEY')
 if not _secret:
-    if DEBUG:
+    if DEBUG or IS_TESTING:
         _secret = 'django-insecure-dev-only-local-key-do-not-use-in-production'
     else:
         from django.core.exceptions import ImproperlyConfigured
@@ -25,8 +44,12 @@ SECRET_KEY = _secret
 _allowed_hosts_raw = os.environ.get('ALLOWED_HOSTS', '')
 if _allowed_hosts_raw:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
-elif DEBUG:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+    if DEBUG or IS_TESTING:
+        for dev_host in ['localhost', '127.0.0.1', '[::1]', 'testserver']:
+            if dev_host not in ALLOWED_HOSTS:
+                ALLOWED_HOSTS.append(dev_host)
+elif DEBUG or IS_TESTING:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'testserver']
 else:
     ALLOWED_HOSTS = []
 
@@ -103,12 +126,6 @@ WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Channel Layer Configuration
-IS_TESTING = (
-    'test' in sys.argv or
-    any('pytest' in arg for arg in sys.argv) or
-    os.environ.get('USE_INMEMORY_CHANNEL_LAYER') == 'true'
-)
-
 if IS_TESTING:
     CHANNEL_LAYERS = {
         'default': {
@@ -193,7 +210,7 @@ else:
 CORS_ALLOW_CREDENTIALS = True
 
 # ─── Production Security Headers ─────────────────────────────────────────────
-if not DEBUG:
+if not DEBUG and not IS_TESTING:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ['true', '1']
     SESSION_COOKIE_SECURE = True
@@ -204,6 +221,8 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+else:
+    SECURE_SSL_REDIRECT = False
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 LOGGING = {
