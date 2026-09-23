@@ -23,8 +23,7 @@ for candidate_env in [BASE_DIR / '.env', BASE_DIR.parent / '.env']:
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 'yes']
 IS_TESTING = (
     'test' in sys.argv or
-    any('pytest' in arg for arg in sys.argv) or
-    os.environ.get('USE_INMEMORY_CHANNEL_LAYER') == 'true'
+    any('pytest' in arg for arg in sys.argv)
 )
 
 # Strict SECRET_KEY — must be set via env in production
@@ -126,7 +125,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Channel Layer Configuration
-if IS_TESTING:
+if IS_TESTING or os.environ.get('USE_INMEMORY_CHANNEL_LAYER') == 'true':
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels.layers.InMemoryChannelLayer',
@@ -159,7 +158,14 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 
 # Database Configuration (PostgreSQL in Production, SQLite fallback for dev/tests)
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
+if IS_TESTING:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+elif DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,

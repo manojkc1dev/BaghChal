@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema_field
 
 User = get_user_model()
 
@@ -26,8 +27,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'wins', 'losses', 'draws', 'win_rate')
         read_only_fields = ('id', 'wins', 'losses', 'draws', 'win_rate')
 
-    def get_win_rate(self, obj):
+    @extend_schema_field(serializers.FloatField)
+    def get_win_rate(self, obj) -> float:
         total = obj.wins + obj.losses + obj.draws
         if total == 0:
             return 0.0
         return round((obj.wins / total) * 100, 2)
+

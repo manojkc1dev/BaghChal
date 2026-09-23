@@ -1,12 +1,13 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from drf_spectacular.utils import extend_schema
 from .serializers import UserRegisterSerializer, UserProfileSerializer
 
 class AuthStatusView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(responses={200: dict})
     def get(self, request):
         return Response({
             "status": "online",
@@ -15,7 +16,9 @@ class AuthStatusView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    serializer_class = UserRegisterSerializer
 
+    @extend_schema(request=UserRegisterSerializer, responses={201: dict, 400: dict})
     def post(self, request):
         serializer = UserRegisterSerializer(data=request.data)
         if serializer.is_valid():
@@ -32,7 +35,10 @@ class RegisterView(APIView):
 
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserProfileSerializer
 
+    @extend_schema(responses={200: UserProfileSerializer})
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+

@@ -9,6 +9,7 @@ from channels.testing import WebsocketCommunicator
 from core.asgi import application
 from game_engine.models import Game
 from rest_framework_simplejwt.tokens import RefreshToken
+from asgiref.sync import sync_to_async
 
 User = get_user_model()
 
@@ -140,7 +141,7 @@ class PlayerRoleAssignmentTest(TestCase):
 
     async def test_third_player_gets_no_role(self):
         """Third player joining a full PVP room gets no assigned role."""
-        user_c = await User.objects.acreate_user(username='spectator', password='Pass123!')
+        user_c = await sync_to_async(User.objects.create_user)(username='spectator', password='Pass123!')
         token_c = get_token(user_c)
 
         url_a = f'ws/game/role_room_3/?token={self.token_a}'

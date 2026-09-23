@@ -6,8 +6,8 @@ import urllib.request
 import urllib.error
 import websockets
 
-BACKEND_HTTP = "http://127.0.0.1:8000"
-BACKEND_WS = "ws://127.0.0.1:8000"
+BACKEND_HTTP = os.environ.get("BACKEND_HTTP", "http://127.0.0.1:8001")
+BACKEND_WS = os.environ.get("BACKEND_WS", "ws://127.0.0.1:8001")
 
 def http_post_json(url, payload):
     data = json.dumps(payload).encode('utf-8')

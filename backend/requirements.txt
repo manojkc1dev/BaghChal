@@ -21,10 +21,10 @@ celery==5.6.3
 certifi==2026.7.22
 cffi==2.1.1
 charset-normalizer==3.4.9
-click==8.4.2
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.3.0
+click==8.4.2
 cloudinary==1.45.0
 constantly==23.10.4
 coverage==7.15.3
@@ -35,7 +35,6 @@ datasets==5.0.1
 defusedxml==0.7.1
 dill==0.4.1
 dj-database-url==3.1.2
-Django==5.2.17
 django-allauth==65.18.0
 django-anymail==15.1
 django-appconf==1.2.0
@@ -53,6 +52,7 @@ django-phonenumber-field==8.5.0
 django-redis==7.0.0
 django-storages==1.14.6
 django-timezone-field==7.2.2
+Django==5.2.17
 django_celery_results==2.6.0
 djangorestframework==3.17.2
 djangorestframework_simplejwt==5.5.1
@@ -81,8 +81,8 @@ iniconfig==2.3.0
 isort==8.0.1
 Jinja2==3.1.6
 jmespath==1.1.0
-jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+jsonschema==4.26.0
 kombu==5.6.2
 librt==0.13.0
 markdown-it-py==4.2.0
@@ -113,9 +113,9 @@ prompt_toolkit==3.0.53
 propcache==0.5.2
 protobuf==7.35.1
 psutil==7.2.2
-psycopg==3.3.4
 psycopg-binary==3.3.4
 psycopg2-binary==2.9.12
+psycopg==3.3.4
 pyarrow==25.0.0
 pycodestyle==2.14.0
 pycparser==3.0
@@ -127,9 +127,9 @@ pylint==4.0.6
 pymongo==4.17.0
 pyOpenSSL==26.4.0
 pyparsing==3.3.2
-pytest==9.1.1
 pytest-cov==7.1.0
 pytest-django==4.12.0
+pytest==9.1.1
 python-crontab==3.3.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
@@ -142,8 +142,8 @@ RapidFuzz==3.14.5
 redis==8.1.0
 referencing==0.37.0
 regex==2026.7.19
-requests==2.34.2
 requests-oauthlib==2.0.0
+requests==2.34.2
 rich==15.0.0
 rpds-py==2026.6.3
 ruff==0.16.3
@@ -162,10 +162,9 @@ tomlkit==0.15.1
 torch==2.13.0
 tqdm==4.70.0
 transformers==5.14.1
-tree-sitter==0.25.2
 tree-sitter-bash==0.25.1
-tree-sitter-c==0.24.2
 tree-sitter-c-sharp==0.23.5
+tree-sitter-c==0.24.2
 tree-sitter-cpp==0.23.4
 tree-sitter-elixir==0.3.5
 tree-sitter-fortran==0.6.0
@@ -188,6 +187,7 @@ tree-sitter-swift==0.7.3
 tree-sitter-typescript==0.23.2
 tree-sitter-verilog==1.0.3
 tree-sitter-zig==1.1.2
+tree-sitter==0.25.2
 Twisted==26.4.0
 txaio==26.6.1
 typer==0.27.1
@@ -200,6 +200,7 @@ urllib3==2.7.0
 uvicorn==0.52.1
 vine==5.1.0
 wcwidth==0.8.2
+websockets==17.1
 whitenoise==6.12.0
 xxhash==3.8.1
 yarl==1.24.5
