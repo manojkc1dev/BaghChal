@@ -30,6 +30,8 @@ constantly==23.10.4
 coverage==7.15.3
 cron-descriptor==1.4.5
 cryptography==50.0.0
+channels>=4.0.0
+channels-redis>=4.1.0
 daphne==4.2.3
 datasets==5.0.1
 defusedxml==0.7.1
